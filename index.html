@@ -235,7 +235,9 @@ function CropModal({src,onConfirm,onCancel,aspect:initAspect}){
   const[box,setBox]=useState({x:5,y:5,w:90,h:90});
   const[drag,setDrag]=useState(null);
   const[asp,setAsp]=useState(initAspect||"free");
+  const[ready,setReady]=useState(false);
   const conRef=useRef(null);
+  const imgRef=useRef(null);
   const asps={"free":null,"1:1":1,"4:3":4/3,"3:4":3/4,"16:9":16/9};
   const clamp=(v,mn,mx)=>Math.max(mn,Math.min(mx,v));
 
@@ -267,24 +269,42 @@ function CropModal({src,onConfirm,onCancel,aspect:initAspect}){
   },[drag,asp]);
 
   useEffect(()=>{
+    if(!ready)return;
     const ar=asps[asp];if(!ar||!conRef.current)return;
     const r=conRef.current.getBoundingClientRect();
-    setBox(b=>({...b,h:Math.min(b.w*(r.width/r.height)/ar,100-b.y)}));
-  },[asp]);
+    if(!r.width||!r.height)return;
+    setBox(b=>{
+      const nh=Math.min(b.w*(r.width/r.height)/ar,100-b.y);
+      return{...b,h:isFinite(nh)&&nh>0?nh:b.h};
+    });
+  },[asp,ready]);
 
   const dn=(e,t)=>{e.preventDefault();e.stopPropagation();setDrag({t,sx:e.clientX,sy:e.clientY,b:{...box}});};
   const hSz={position:"absolute",width:12,height:12,background:"#fff",border:"2px solid #378ADD",borderRadius:2,zIndex:2};
 
   const confirm=()=>{
-    const img=new Image();
-    img.onload=()=>{
+    const draw=(img)=>{
       const cv=document.createElement("canvas");
       const W=img.naturalWidth,H=img.naturalHeight;
-      const x=box.x/100*W,y=box.y/100*H,w=box.w/100*W,h=box.h/100*H;
+      const safe=(v,mx)=>{const n=Number(v);return isFinite(n)&&n>0?n:mx;};
+      const bx=safe(box.x,0),by=safe(box.y,0);
+      const bw=safe(box.w,100-bx),bh=safe(box.h,100-by);
+      const x=Math.max(0,bx/100*W),y=Math.max(0,by/100*H);
+      const w=Math.max(1,Math.min(W-x,bw/100*W)),h=Math.max(1,Math.min(H-y,bh/100*H));
       cv.width=Math.round(w);cv.height=Math.round(h);
-      cv.getContext("2d").drawImage(img,x,y,w,h,0,0,Math.round(w),Math.round(h));
-      onConfirm(cv.toDataURL("image/jpeg",0.9));
+      try{
+        cv.getContext("2d").drawImage(img,x,y,w,h,0,0,Math.round(w),Math.round(h));
+        onConfirm(cv.toDataURL("image/jpeg",0.9));
+      }catch(err){
+        console.error("Crop failed",err);
+        onConfirm(src);
+      }
     };
+    const ex=imgRef.current;
+    if(ex&&ex.complete&&ex.naturalWidth){draw(ex);return;}
+    const img=new Image();
+    img.onload=()=>draw(img);
+    img.onerror=()=>onConfirm(src);
     img.src=src;
   };
 
@@ -303,7 +323,7 @@ function CropModal({src,onConfirm,onCancel,aspect:initAspect}){
           <span style={{color:"#9ca3af",fontSize:".72rem",marginLeft:4}}>Drag to move/resize</span>
         </div>
         <div ref={conRef} style={{position:"relative",userSelect:"none",lineHeight:0,borderRadius:8,overflow:"hidden"}}>
-          <img src={src} style={{maxWidth:"min(68vw,780px)",maxHeight:"58vh",display:"block"}}/>
+          <img ref={imgRef} src={src} onLoad={()=>setReady(true)} style={{maxWidth:"min(68vw,780px)",maxHeight:"58vh",display:"block"}}/>
           <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.52)",pointerEvents:"none"}}/>
           <div style={{position:"absolute",left:`${box.x}%`,top:`${box.y}%`,width:`${box.w}%`,height:`${box.h}%`,
             border:"2px solid #fff",cursor:"move",boxSizing:"border-box",
