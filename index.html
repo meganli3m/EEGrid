@@ -5,7 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>EEGrid — UCSD Senior Design 2026</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════════════════════
+//  SUPABASE CONFIG — fill these in after creating a project
+// ══════════════════════════════════════════════════════════
+window.SUPABASE_URL = 'https://pxqwmgsybegjcagusghc.supabase.co/rest/v1/';        // e.g. https://xxxx.supabase.co
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4cXdtZ3N5YmVnamNhZ3VzZ2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MTg3MzcsImV4cCI6MjA5NjI5NDczN30.QLI4Qi-yqvBzUWD5qDXG_akZthTa3DD0SjyxZIzBdJ0'; // from Project Settings > API
+window.SUPABASE_BUCKET = 'eegrid-photos';          // storage bucket name (create it below)
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <!-- Lucide icons via CDN -->
@@ -141,7 +151,7 @@ function FadeUp({children,delay=0,style={}}){
   );
 }
 
-function Nav({page,go}){
+function Nav({page,go,goTab}){
   const[open,setOpen]=useState(false);
   const links=[{id:"home",l:"Home"},{id:"problem",l:"Problem"},{id:"solution",l:"Our Solution",sub:[{id:"solution",tab:"overview",l:"Overview"},{id:"solution",tab:"technical",l:"Technical Details"},{id:"solution",tab:"demo",l:"Demo Video"}]},{id:"team",l:"Team"},{id:"ack",l:"Acknowledgements"}];
   const active=id=>id==="team"&&page.startsWith("member-")?true:page===id;
@@ -158,7 +168,7 @@ function Nav({page,go}){
               {l.l}<span style={{fontSize:".55rem",opacity:.7}}>▼</span>
             </button>
             <div className="dd-menu" style={{position:"absolute",top:"100%",left:"50%",transform:"translateX(-50%)",background:"#fff",borderRadius:10,boxShadow:"0 8px 32px rgba(0,0,0,.18)",padding:".5rem",minWidth:160,marginTop:6,zIndex:300}}>
-              {l.sub.map(s=><button key={s.l} onClick={()=>{go(l.id);window.scrollTo(0,0);setTimeout(()=>{const el=document.querySelector(`[data-tab="${s.tab}"]`);if(el)el.click();},200);}} style={{display:"block",width:"100%",textAlign:"left",padding:".45rem .85rem",background:"none",border:"none",cursor:"pointer",borderRadius:7,fontSize:".82rem",color:"#042C53",fontWeight:500}} onMouseEnter={e=>e.target.style.background="#E6F1FB"} onMouseLeave={e=>e.target.style.background="none"}>{s.l}</button>)}
+              {l.sub.map(s=><button key={s.l} onClick={()=>{goTab(l.id,s.tab);}} style={{display:"block",width:"100%",textAlign:"left",padding:".45rem .85rem",background:"none",border:"none",cursor:"pointer",borderRadius:7,fontSize:".82rem",color:"#042C53",fontWeight:500}} onMouseEnter={e=>e.target.style.background="#E6F1FB"} onMouseLeave={e=>e.target.style.background="none"}>{s.l}</button>)}
             </div>
           </div>
           :<button key={l.id} className={`nl${active(l.id)?" on":""}`} onClick={()=>nav(l.id)}>{l.l}</button>
@@ -345,11 +355,57 @@ function CropModal({src,onConfirm,onCancel,aspect:initAspect}){
   );
 }
 
+// ── Supabase helper ─────────────────────────────────────────────────────────
+function getSupabase(){
+  if(window.SUPABASE_URL==='YOUR_SUPABASE_URL'||!window.supabase)return null;
+  if(!window._sb)window._sb=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_ANON_KEY);
+  return window._sb;
+}
+
+async function uploadToSupabase(photoId,dataUrl){
+  const sb=getSupabase();if(!sb)return null;
+  try{
+    // Convert base64 to blob
+    const res=await fetch(dataUrl);
+    const blob=await res.blob();
+    const ext=blob.type.includes('png')?'png':'jpg';
+    const path=`photos/${photoId}.${ext}`;
+    const{error}=await sb.storage.from(window.SUPABASE_BUCKET).upload(path,blob,{upsert:true,contentType:blob.type});
+    if(error)throw error;
+    const{data}=sb.storage.from(window.SUPABASE_BUCKET).getPublicUrl(path);
+    // Bust cache with timestamp
+    return data.publicUrl+'?t='+Date.now();
+  }catch(e){console.warn('Supabase upload failed:',e);return null;}
+}
+
+async function loadFromSupabase(){
+  const sb=getSupabase();if(!sb)return {};
+  try{
+    const{data,error}=await sb.storage.from(window.SUPABASE_BUCKET).list('photos');
+    if(error||!data)return {};
+    const imgs={};
+    for(const file of data){
+      const id=file.name.replace(/\.\w+$/,'');
+      const{data:d}=sb.storage.from(window.SUPABASE_BUCKET).getPublicUrl('photos/'+file.name);
+      imgs[id]=d.publicUrl+'?t='+file.updated_at;
+    }
+    return imgs;
+  }catch(e){console.warn('Supabase load failed:',e);return {};}
+}
+
 function UploadProvider({children}){
   const[imgs,setImgs]=useState({});
   const[modal,setModal]=useState(null);
+  const[loading,setLoading]=useState(false);
   const fileRef=useRef(null);
   const pending=useRef({});
+
+  // Load persisted images on mount
+  useEffect(()=>{
+    loadFromSupabase().then(saved=>{
+      if(Object.keys(saved).length>0)setImgs(saved);
+    });
+  },[]);
 
   const open=(id,aspect)=>{
     pending.current={id,aspect};
@@ -365,13 +421,18 @@ function UploadProvider({children}){
     reader.readAsDataURL(file);
   };
 
-  const onConfirm=b64=>{
-    setImgs(p=>({...p,[modal.id]:b64}));
+  const onConfirm=async(b64)=>{
+    const id=modal.id;
     setModal(null);
+    // Show immediately in-memory
+    setImgs(p=>({...p,[id]:b64}));
+    // Upload to Supabase in background
+    const url=await uploadToSupabase(id,b64);
+    if(url)setImgs(p=>({...p,[id]:url}));
   };
 
   return(
-    <UploadCtx.Provider value={{imgs,open}}>
+    <UploadCtx.Provider value={{imgs,open,loading}}>
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={onFile}/>
       {modal&&<CropModal src={modal.src} aspect={modal.aspect} onConfirm={onConfirm} onCancel={()=>setModal(null)}/>}
       {children}
@@ -573,8 +634,8 @@ function ProblemPage(){
   );
 }
 
-function SolutionPage(){
-  const[tab,setTab]=useState("overview");
+function SolutionPage({defaultTab}){
+  const[tab,setTab]=useState(defaultTab||"overview");
   const ctx=React.useContext(UploadCtx);
   return(
     <>
@@ -815,15 +876,17 @@ function AckPage(){
 
 function App(){
   const[page,setPage]=useState("home");
+  const[solutionTab,setSolutionTab]=useState("overview");
   const go=p=>{setPage(p);window.scrollTo({top:0,behavior:"smooth"});};
+  const goTab=(p,tab)=>{setSolutionTab(tab);setPage(p);window.scrollTo({top:0,behavior:"smooth"});};
   const mid=page.startsWith("member-")?parseInt(page.split("-")[1]):null;
   return(
     <UploadProvider><div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:"#f9fafb",fontFamily:"system-ui,-apple-system,sans-serif",fontSize:"16px"}}>
-      <Nav page={page} go={go}/>
+      <Nav page={page} go={go} goTab={goTab}/>
       <main style={{flex:1}}>
         {page==="home"&&<HomePage go={go}/>}
         {page==="problem"&&<ProblemPage/>}
-        {page==="solution"&&<SolutionPage/>}
+        {page==="solution"&&<SolutionPage defaultTab={solutionTab}/>}
         {page==="team"&&<TeamPage go={go}/>}
         {mid!==null&&<MemberPage id={mid} go={go}/>}
         {page==="ack"&&<AckPage/>}
