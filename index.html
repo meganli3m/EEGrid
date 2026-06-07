@@ -484,9 +484,9 @@ function PH({icon="camera",title,sub,h=180,phId,aspect}){
   const img=ctx&&phId?ctx.imgs[phId]:null;
   const canEdit=ctx&&ctx.editMode&&phId;
   if(img)return(
-    <div style={{position:"relative",borderRadius:12,overflow:"hidden",minHeight:h,cursor:canEdit?"pointer":"default"}}
+    <div style={{position:"relative",borderRadius:12,overflow:"hidden",minHeight:h,cursor:canEdit?"pointer":"default",background:phId==="poster-image"?"#f8f9fa":"transparent"}}
       onClick={()=>canEdit&&ctx.open(phId,aspect)} title={canEdit?"Click to replace":""}>
-      <img src={img} style={{width:"100%",height:"100%",objectFit:"cover",display:"block",minHeight:h}}/>
+      <img src={img} style={{width:"100%",height:phId==="poster-image"?"auto":"100%",objectFit:phId==="poster-image"?"contain":"cover",display:"block",minHeight:phId==="poster-image"?0:h}}/>
       {canEdit&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
         onMouseEnter={e=>{e.currentTarget.style.opacity=1;e.currentTarget.style.background="rgba(0,0,0,.38)";}}
         onMouseLeave={e=>{e.currentTarget.style.opacity=0;e.currentTarget.style.background="transparent";}}>
@@ -632,8 +632,8 @@ function HomePage({go}){
       <SEC>
         <SH label="DEBUT Competition" title="Our Research Poster"/>
         <p style={{color:"#6b7280",fontSize:".975rem",lineHeight:1.75,marginBottom:"1.5rem"}}>Our full research poster was presented at the <strong>2026 DEBUT (Design by Biomedical Undergraduate Teams) competition</strong>, a national biomedical engineering design challenge sponsored by the National Institute of Biomedical Imaging and Bioengineering (NIBIB).</p>
-        <div style={{position:"relative",borderRadius:14,overflow:"hidden",border:".5px solid #e5e7eb",boxShadow:"0 4px 24px rgba(4,44,83,.08)"}}>
-          <PH icon="file-text" title="Upload Poster Image" sub="Click to upload a high-res image of your DEBUT poster" phId="poster-image" aspect="16:9" h={420}/>
+        <div style={{borderRadius:14,border:".5px solid #e5e7eb",boxShadow:"0 4px 24px rgba(4,44,83,.08)",overflow:"hidden"}}>
+          <PH icon="file-text" title="Upload Poster Image" sub="Click to upload a high-res image of your DEBUT poster" phId="poster-image" aspect="free" h={420}/>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"1rem",marginTop:"1.5rem"}}>
           <KCard icon="activity" title="Impedance" text="Achieved 30 kΩ skin-electrode impedance — meeting IEC 60601-1 requirements for EEG signal acquisition."/>
