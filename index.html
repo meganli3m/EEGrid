@@ -155,7 +155,7 @@ function FadeUp({children,delay=0,style={}}){
   );
 }
 
-function Nav({page,go,goTab}){
+function Nav({page,go,goTab,goBack,canGoBack}){
   const[open,setOpen]=useState(false);
   const[ddOpen,setDdOpen]=useState(false);
   const links=[{id:"home",l:"Home"},{id:"problem",l:"Problem"},{id:"solution",l:"Our Solution",sub:[{id:"solution",tab:"overview",l:"Overview"},{id:"solution",tab:"technical",l:"Technical Details"},{id:"solution",tab:"demo",l:"Videos"}]},{id:"team",l:"Team"},{id:"ack",l:"Acknowledgements"}];
@@ -163,9 +163,15 @@ function Nav({page,go,goTab}){
   const nav=id=>{go(id);setOpen(false);window.scrollTo(0,0);};
   return(
     <nav style={{position:"sticky",top:0,zIndex:200,background:C.bd,padding:"0 2rem",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:".5px solid rgba(55,138,221,.25)"}}>
-      <button style={{background:"none",border:"none",fontWeight:700,fontSize:"1.2rem",color:"#fff",letterSpacing:"-.01em",cursor:"pointer",padding:0,fontFamily:"'Space Grotesk',sans-serif"}} onClick={()=>nav("home")}>
+      <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+        {canGoBack&&<button onClick={goBack} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.7)",display:"flex",alignItems:"center",gap:4,padding:"4px 0",fontSize:".82rem",fontWeight:500}} title="Go back">
+          <Icon name="arrow-left" size={15} color="rgba(255,255,255,.7)"/>
+          <span style={{display:"none"}} className="back-label">Back</span>
+        </button>}
+        <button style={{background:"none",border:"none",fontWeight:700,fontSize:"1.2rem",color:"#fff",letterSpacing:"-.01em",cursor:"pointer",padding:0,fontFamily:"'Space Grotesk',sans-serif"}} onClick={()=>nav("home")}>
         <img src="data:image/png;base64,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" alt="EEGrid logo" style={{width:32,height:32,marginRight:8,verticalAlign:"middle",borderRadius:6}}/><span style={{color:"#fff"}}>EEG</span><em style={{fontStyle:"italic",color:"#B5D4F4"}}>rid</em>
       </button>
+      </div>
       <div className="desktop-links" style={{display:"flex",gap:"1.2rem",alignItems:"center"}}>
         {links.map(l=>l.sub
           ?<div key={l.id} style={{position:"relative"}} className="dd-wrap" onMouseEnter={()=>setDdOpen(true)} onMouseLeave={()=>setDdOpen(false)}>
@@ -693,6 +699,7 @@ function ProblemPage(){
 function SolutionPage({defaultTab}){
   const[tab,setTab]=useState(defaultTab||"overview");
   const ctx=React.useContext(UploadCtx);
+  const mob=useIsMob();
   return(
     <>
       <PH2 title="Our Solution" sub=""/>
@@ -731,13 +738,13 @@ function SolutionPage({defaultTab}){
           <h3 style={{fontWeight:700,fontSize:"1.5rem",color:"#042C53",marginTop:"2rem",marginBottom:"1rem",letterSpacing:"-.02em"}}>Hydrogel Electrode</h3>
           <p style={{color:"#6b7280",fontSize:".975rem",lineHeight:1.75,marginBottom:"1.5rem"}}>The hardware system integrates three subsystems: the hydrogel electrode assembly, the active electrode PCB, and the modular headset frame. Each electrode site hosts a dedicated PCB performing local signal conditioning before data is routed to a central 8-channel breakout board. The headset frame is fabricated entirely from 3D-printed PLA (rigid holders) and TPU (flexible straps), with no metal fasteners required.</p>
           <h4 style={{fontWeight:700,fontSize:"1.1rem",color:"#185FA5",marginBottom:".75rem",letterSpacing:".01em"}}>Components</h4>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:0,marginBottom:"1.25rem",border:".5px solid #e5e7eb",borderRadius:12,overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"repeat(3,1fr)",gap:mob?".75rem":0,marginBottom:"1.25rem",border:".5px solid #e5e7eb",borderRadius:12,overflow:"hidden"}}>
             {[
               {num:"1",icon:"test-tube",title:"Hydrogel Electrode",text:"PEDOT:PSS + PVA + GA + DMSO + HCl -- three-pronged comb morphology, 30 kΩ ECI, stable for 5+ days"},
               {num:"2",icon:"chip",title:"Active Electrode PCB",text:"Unity-gain INA, RC filtering, 4-position FFC connector, fabricated via JLCPCB with in-house SMD assembly"},
               {num:"3",icon:"puzzle",title:"Modular Frame",text:"PLA electrode holders + TPU straps (20–30 mm range) -- bulb-pin connector system, fits 52–60 cm circumference, nasion–inion 33–39 cm"},
             ].map((item,i)=>(
-              <div key={i} style={{padding:"1.25rem",borderRight:i<2?".5px solid rgba(255,255,255,.15)":"none",background:i%2===0?"#185FA5":"#0C447C"}}>
+              <div key={i} style={{padding:mob?".85rem 1rem":"1.25rem",borderRight:mob?"none":i<2?".5px solid rgba(255,255,255,.15)":"none",borderBottom:mob&&i<2?".5px solid rgba(255,255,255,.15)":"none",background:i%2===0?"#185FA5":"#0C447C"}}>
                 <div style={{display:"flex",alignItems:"center",gap:".5rem",marginBottom:".65rem"}}>
                   <span style={{width:22,height:22,borderRadius:"50%",background:"#E6F1FB",color:"#042C53",fontSize:".65rem",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{item.num}</span>
                   <Icon name={item.icon} size={16} color="#B5D4F4"/>
@@ -747,7 +754,7 @@ function SolutionPage({defaultTab}){
               </div>
             ))}
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+          <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:"1rem"}}>
             <div><PH icon="cpu" title="PCB / Schematic" sub="Click to upload" phId="pcb-photo" aspect="4:3" h={160}/><p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 1. Preprocessing PCB printed to scale with SMD components assembled.</p></div>
             <div><PH icon="camera" title="Hydrogel Electrode" sub="Click to upload" phId="hydrogel-photo" aspect="4:3" h={160}/><p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 2. Cured PEDOT:PSS hydrogel electrode tips showing three-pronged comb morphology.</p></div>
           </div>
@@ -755,7 +762,7 @@ function SolutionPage({defaultTab}){
           <h3 style={{fontWeight:700,fontSize:"1.5rem",color:"#042C53",marginBottom:"1rem",letterSpacing:"-.02em"}}>Adjustable Headset</h3>
           <p style={{color:"#6b7280",fontSize:".975rem",lineHeight:1.75,marginBottom:"1.5rem"}}>The headset frame is constructed entirely from 3D-printed components -- rigid PLA electrode holders and flexible TPU straps -- enabling a single system to be reconfigured for different head sizes and electrode paradigms without purchasing additional caps. The design accommodates head circumferences of 52–60 cm, nasion–inion distances of 33–39 cm, and tragus–tragus distances of 32–27 cm, following the 10–20 EEG placement system.</p>
           <h4 style={{fontWeight:700,fontSize:"1.1rem",color:"#185FA5",marginBottom:".75rem",letterSpacing:".01em"}}>Components</h4>
-          <div style={{border:".5px solid rgba(255,255,255,.15)",borderRadius:12,overflow:"hidden",marginBottom:"1.25rem",display:"grid",gridTemplateColumns:"1fr 1fr"}}>
+          <div style={{border:".5px solid rgba(255,255,255,.15)",borderRadius:12,overflow:"hidden",marginBottom:"1.25rem",display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr"}}>  
             {[
               {num:"1",icon:"settings",title:"Modular Electrode Holders",text:"PLA holders with 4-point bulb-pin system -- supports 6 brain region configurations (frontal, central, parietal, occipital, temporal, auditory)"},
               {num:"2",icon:"adjustments",title:"Interchangeable TPU Straps",text:"Continuous length range engraved in mm for easy sizing and assembly, with rotary actuator and corrugated TPU bellows for consistent scalp contact"},
@@ -778,7 +785,7 @@ function SolutionPage({defaultTab}){
               </div>
             ))}
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+          <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:"1rem"}}>
             <div><PH icon="settings" title="Headset on Subject" sub="Click to upload" phId="headset-photo" aspect="4:3" h={160}/><p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 3. EEGrid headset worn by subject during real-world fit testing.</p></div>
             <div><PH icon="camera" title="CAD Render / Assembly" sub="Click to upload" phId="cad-photo" aspect="4:3" h={160}/><p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 4. CAD render of modular electrode housing assembly with TPU strap connection.</p></div>
           </div>
@@ -959,12 +966,14 @@ function AckPage(){
 function App(){
   const[page,setPage]=useState("home");
   const[solutionTab,setSolutionTab]=useState("overview");
-  const go=p=>{setPage(p);window.scrollTo({top:0,behavior:"smooth"});};
-  const goTab=(p,tab)=>{setSolutionTab(tab);setPage(p);window.scrollTo({top:0,behavior:"smooth"});};
+  const[history,setHistory]=useState([]);
+  const go=p=>{setHistory(h=>[...h,page]);setPage(p);window.scrollTo({top:0,behavior:"smooth"});};
+  const goTab=(p,tab)=>{setHistory(h=>[...h,page]);setSolutionTab(tab);setPage(p);window.scrollTo({top:0,behavior:"smooth"});};
+  const goBack=()=>{if(history.length===0)return;const prev=history[history.length-1];setHistory(h=>h.slice(0,-1));setPage(prev);window.scrollTo({top:0,behavior:"smooth"});};
   const mid=page.startsWith("member-")?parseInt(page.split("-")[1]):null;
   return(
     <UploadProvider><div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:"#f9fafb",fontFamily:"system-ui,-apple-system,sans-serif",fontSize:"16px"}}>
-      <Nav page={page} go={go} goTab={goTab}/>
+      <Nav page={page} go={go} goTab={goTab} goBack={goBack} canGoBack={history.length>0}/>
       <main style={{flex:1}}>
         {page==="home"&&<HomePage go={go}/>}
         {page==="problem"&&<ProblemPage/>}
