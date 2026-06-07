@@ -361,6 +361,26 @@ function CropModal({src,onConfirm,onCancel,aspect:initAspect}){
 }
 
 function UploadProvider({children}){
+  const SECRET='eegrid2026';
+  const[editMode,setEditMode]=useState(false);
+  const[keyBuf,setKeyBuf]=useState('');
+
+  useEffect(()=>{
+    const handler=e=>{
+      setKeyBuf(b=>{
+        const next=(b+e.key).slice(-SECRET.length);
+        if(next===SECRET){setEditMode(m=>{
+          if(!m)alert('Edit mode ON. Click any photo to replace.');
+          else alert('Edit mode OFF.');
+          return !m;
+        });return '';}
+        return next;
+      });
+    };
+    window.addEventListener('keydown',handler);
+    return()=>window.removeEventListener('keydown',handler);
+  },[]);
+
   const[imgs,setImgs]=useState({});
   const[modal,setModal]=useState(null);
   const[syncing,setSyncing]=useState(false);
@@ -419,8 +439,9 @@ function UploadProvider({children}){
   };
 
   return(
-    <UploadCtx.Provider value={{imgs,open,syncing}}>
+    <UploadCtx.Provider value={{imgs,open,syncing,editMode}}>
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={onFile}/>
+      {editMode&&<div style={{position:"fixed",bottom:20,left:20,background:"#042C53",color:"#B5D4F4",padding:"7px 16px",borderRadius:20,fontSize:".78rem",fontWeight:500,zIndex:9997,boxShadow:"0 2px 12px rgba(0,0,0,.4)"}}>Edit mode ON</div>}
       {syncing&&<div style={{position:"fixed",bottom:20,right:20,background:"#042C53",color:"#fff",padding:"8px 16px",borderRadius:8,fontSize:".8rem",zIndex:9998}}>Saving photo...</div>}
       {modal&&<CropModal src={modal.src} aspect={modal.aspect} onConfirm={onConfirm} onCancel={()=>setModal(null)}/>}
       {children}
@@ -431,26 +452,33 @@ function UploadProvider({children}){
 function PH({icon="camera",title,sub,h=180,phId,aspect}){
   const ctx=React.useContext(UploadCtx);
   const img=ctx&&phId?ctx.imgs[phId]:null;
+  const canEdit=ctx&&ctx.editMode&&phId;
   if(img)return(
-    <div style={{position:"relative",borderRadius:12,overflow:"hidden",minHeight:h,cursor:"pointer"}}
-      onClick={()=>ctx.open(phId,aspect)} title="Click to replace">
+    <div style={{position:"relative",borderRadius:12,overflow:"hidden",minHeight:h,cursor:canEdit?"pointer":"default"}}
+      onClick={()=>canEdit&&ctx.open(phId,aspect)} title={canEdit?"Click to replace":""}>
       <img src={img} style={{width:"100%",height:"100%",objectFit:"cover",display:"block",minHeight:h}}/>
-      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
+      {canEdit&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
         onMouseEnter={e=>{e.currentTarget.style.opacity=1;e.currentTarget.style.background="rgba(0,0,0,.38)";}}
         onMouseLeave={e=>{e.currentTarget.style.opacity=0;e.currentTarget.style.background="transparent";}}>
         <span style={{color:"#fff",fontSize:".8rem",fontWeight:500,background:"rgba(0,0,0,.5)",padding:"4px 12px",borderRadius:20}}>Replace photo</span>
-      </div>
+      </div>}
+    </div>
+  );
+  if(!canEdit)return(
+    <div style={{background:C.bx,border:"1.5px dashed rgba(55,138,221,.15)",borderRadius:12,padding:"1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",minHeight:h,gap:6,opacity:.5}}>
+      <Icon name={icon} size={20} color={C.ba} style={{opacity:.4}}/>
+      <strong style={{color:C.bm,fontSize:".875rem"}}>{title}</strong>
     </div>
   );
   return(
-    <div style={{background:C.bx,border:"1.5px dashed rgba(55,138,221,.4)",borderRadius:12,padding:"1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",minHeight:h,gap:6,cursor:ctx&&phId?"pointer":"default",transition:"border-color .15s,background .15s"}}
-      onClick={()=>ctx&&phId&&ctx.open(phId,aspect)}
-      onMouseEnter={e=>{if(ctx&&phId){e.currentTarget.style.borderColor="rgba(55,138,221,.75)";e.currentTarget.style.background="#daeaf7";}}}
+    <div style={{background:C.bx,border:"1.5px dashed rgba(55,138,221,.4)",borderRadius:12,padding:"1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",minHeight:h,gap:6,cursor:"pointer",transition:"border-color .15s,background .15s"}}
+      onClick={()=>ctx.open(phId,aspect)}
+      onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(55,138,221,.75)";e.currentTarget.style.background="#daeaf7";}}
       onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(55,138,221,.4)";e.currentTarget.style.background=C.bx;}}>
-      <Icon name={ctx&&phId?"camera":icon} size={20} color={C.ba} style={{opacity:.55}}/>
+      <Icon name="camera" size={20} color={C.ba} style={{opacity:.55}}/>
       <strong style={{color:C.bm,fontSize:".975rem"}}>{title}</strong>
       {sub&&<p style={{color:C.bb,fontSize:".75rem",maxWidth:280,margin:0}}>{sub}</p>}
-      {ctx&&phId&&<span style={{color:C.ba,fontSize:".7rem",marginTop:2,opacity:.75}}>Click to upload</span>}
+      <span style={{color:C.ba,fontSize:".7rem",marginTop:2,opacity:.75}}>Click to upload</span>
     </div>
   );
 }
@@ -775,7 +803,7 @@ function TeamPage({go}){
         <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(5,1fr)",gap:"1rem",marginTop:"1.75rem"}}>
           {MEMBERS.map(m=>(
             <div key={m.id} className="tc" style={{background:"#fff",border:".5px solid #e5e7eb",borderRadius:12,padding:mob?"1.25rem .85rem":"1.4rem 1rem",textAlign:"center"}} onClick={()=>go(`member-${m.id}`)}>
-              {(()=>{const tp=ctx&&ctx.imgs&&ctx.imgs[`team-${m.id}`];return tp?<img src={tp} onClick={e=>{e.stopPropagation();ctx.open(`team-${m.id}`,"1:1");}} style={{width:mob?50:56,height:mob?50:56,borderRadius:"50%",objectFit:"cover",margin:"0 auto .7rem",display:"block",border:"2px solid rgba(55,138,221,.3)",cursor:"pointer"}}/>:<div style={{width:mob?50:56,height:mob?50:56,borderRadius:"50%",background:m.bg,margin:"0 auto .7rem",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:mob?".9rem":"1rem",color:"#fff",cursor:"pointer"}} onClick={e=>{e.stopPropagation();ctx&&ctx.open(`team-${m.id}`,"1:1");}} title="Upload photo">{m.init}</div>;})()}
+              {(()=>{const tp=ctx&&ctx.imgs&&ctx.imgs[`team-${m.id}`];return tp?<img src={tp} onClick={e=>{e.stopPropagation();ctx&&ctx.editMode&&ctx.open(`team-${m.id}`,"1:1");}} style={{width:mob?50:56,height:mob?50:56,borderRadius:"50%",objectFit:"cover",margin:"0 auto .7rem",display:"block",border:"2px solid rgba(55,138,221,.3)",cursor:"pointer"}}/>:<div style={{width:mob?50:56,height:mob?50:56,borderRadius:"50%",background:m.bg,margin:"0 auto .7rem",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:mob?".9rem":"1rem",color:"#fff",cursor:"pointer"}} onClick={e=>{e.stopPropagation();ctx&&ctx.editMode&&ctx.open(`team-${m.id}`,"1:1");}} title={ctx&&ctx.editMode?"Click to upload photo":""}>{m.init}</div>;})()}
               <h3 style={{fontWeight:500,fontSize:mob?".78rem":".82rem",color:"#111",marginBottom:".15rem",marginTop:0}}>{m.name}</h3>
               
               <span style={{color:C.ba,fontSize:".7rem",fontWeight:500,display:"inline-flex",alignItems:"center",gap:2}}>View <Icon name="arrow-right" size={9} color={C.ba}/></span>
@@ -805,7 +833,7 @@ function MemberPage({id,go}){
     <>
       <div style={{background:C.bd,padding:mob?"2rem 1.25rem":"2.75rem 1.75rem"}}>
         <div style={{maxWidth:1020,margin:"0 auto",display:"flex",flexDirection:mob?"column":"row",alignItems:mob?"flex-start":"center",gap:mob?"1rem":"1.75rem"}}>
-          {(()=>{const tp=ctx&&ctx.imgs&&ctx.imgs[`team-${m.id}`];const src=tp||d.photo;return src?<img src={src} alt={m.name} style={{width:mob?72:90,height:mob?72:90,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid rgba(55,138,221,.4)",cursor:"pointer"}} onClick={()=>ctx&&ctx.open(`team-${m.id}`,"1:1")} title="Click to change photo"/>:<div style={{width:mob?72:90,height:mob?72:90,borderRadius:"50%",background:m.bg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:mob?"1.3rem":"1.6rem",color:"#fff",cursor:"pointer"}} onClick={()=>ctx&&ctx.open(`team-${m.id}`,"1:1")} title="Upload photo">{m.init}</div>;})()}
+          {(()=>{const tp=ctx&&ctx.imgs&&ctx.imgs[`team-${m.id}`];const src=tp||d.photo;return src?<img src={src} alt={m.name} style={{width:mob?72:90,height:mob?72:90,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid rgba(55,138,221,.4)",cursor:"pointer"}} onClick={()=>ctx&&ctx.editMode&&ctx.open(`team-${m.id}`,"1:1")} title={ctx&&ctx.editMode?"Click to change photo":""}/>:<div style={{width:mob?72:90,height:mob?72:90,borderRadius:"50%",background:m.bg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:mob?"1.3rem":"1.6rem",color:"#fff",cursor:"pointer"}} onClick={()=>ctx&&ctx.editMode&&ctx.open(`team-${m.id}`,"1:1")} title={ctx&&ctx.editMode?"Upload photo":""}>{m.init}</div>;})()}
           <div>
             <h1 style={{fontSize:mob?"1.35rem":"clamp(1.35rem,3.5vw,1.85rem)",fontWeight:500,color:"#fff",letterSpacing:"-.03em",marginBottom:".25rem",marginTop:0}}>{m.name}</h1>
             <p style={{color:C.ba,fontSize:".975rem",fontWeight:500,margin:0}}>{m.role}</p>
@@ -827,7 +855,7 @@ function MemberPage({id,go}){
             const tp=ctx&&ctx.imgs&&ctx.imgs[`team-${m.id}`];
             const src=tp||d.photo;
             return src
-              ?<div style={{position:"relative",justifySelf:"center",cursor:"pointer"}} onClick={()=>ctx&&ctx.open(`team-${m.id}`,"3:4")} title="Click to replace photo">
+              ?<div style={{position:"relative",justifySelf:"center",cursor:"pointer"}} onClick={()=>ctx&&ctx.editMode&&ctx.open(`team-${m.id}`,"3:4")} title={ctx&&ctx.editMode?"Click to replace photo":""}>
                 <img src={src} alt={m.name} style={{width:"100%",maxWidth:320,borderRadius:14,objectFit:"cover",aspectRatio:"3/4",display:"block",border:".5px solid #e5e7eb"}}/>
                 <div style={{position:"absolute",inset:0,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
                   onMouseEnter={e=>{e.currentTarget.style.opacity=1;e.currentTarget.style.background="rgba(0,0,0,.35)";}}
@@ -835,7 +863,7 @@ function MemberPage({id,go}){
                   <span style={{color:"#fff",fontSize:".8rem",fontWeight:500,background:"rgba(0,0,0,.5)",padding:"6px 14px",borderRadius:20}}>Replace photo</span>
                 </div>
               </div>
-              :<div onClick={()=>ctx&&ctx.open(`team-${m.id}`,"3:4")} style={{justifySelf:"center",width:"100%",maxWidth:320,aspectRatio:"3/4",background:C.bx,border:"1.5px dashed rgba(55,138,221,.4)",borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer",minHeight:260}}
+              :<div onClick={()=>ctx&&ctx.editMode&&ctx.open(`team-${m.id}`,"3:4")} style={{justifySelf:"center",width:"100%",maxWidth:320,aspectRatio:"3/4",background:C.bx,border:"1.5px dashed rgba(55,138,221,.4)",borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer",minHeight:260}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(55,138,221,.75)";e.currentTarget.style.background="#daeaf7";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(55,138,221,.4)";e.currentTarget.style.background=C.bx;}}>
                 <Icon name="camera" size={22} color={C.ba} style={{opacity:.6}}/>
