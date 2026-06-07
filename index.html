@@ -414,21 +414,45 @@ function UploadProvider({children}){
     const file=e.target.files[0];
     if(!file)return;
     e.target.value='';
+    const isGif=file.type==='image/gif';
     const reader=new FileReader();
-    reader.onload=ev=>setModal({id:pending.current.id,src:ev.target.result,aspect:pending.current.aspect});
+    reader.onload=ev=>{
+      if(isGif){
+        // Skip crop for GIFs — use as-is
+        const b64=ev.target.result;
+        const id=pending.current.id;
+        setImgs(p=>({...p,[id]:b64}));
+        setSyncing(true);
+        fetch(b64).then(r=>r.blob()).then(blob=>{
+          const path='photos/'+id+'.gif';
+          return sb.storage.from(BUCKET).upload(path,blob,{upsert:true,contentType:'image/gif'});
+        }).then(({error,data})=>{
+          if(error)throw error;
+          const{data:d}=sb.storage.from(BUCKET).getPublicUrl('photos/'+id+'.gif');
+          setImgs(p=>({...p,[id]:d.publicUrl+'?v='+Date.now()}));
+        }).catch(e=>console.warn('GIF upload failed:',e)).finally(()=>setSyncing(false));
+      } else {
+        setModal({id:pending.current.id,src:ev.target.result,aspect:pending.current.aspect});
+      }
+    };
     reader.readAsDataURL(file);
   };
 
   const onConfirm=async(b64)=>{
     const id=modal.id;
+    const isGif=modal.src&&modal.src.startsWith('data:image/gif');
+    // For GIFs use the original src (skip crop canvas which kills animation)
+    const finalB64=isGif?modal.src:b64;
     setModal(null);
-    setImgs(p=>({...p,[id]:b64}));
+    setImgs(p=>({...p,[id]:finalB64}));
     setSyncing(true);
     try{
-      const res=await fetch(b64);
+      const res=await fetch(finalB64);
       const blob=await res.blob();
-      const path='photos/'+id+'.jpg';
-      const{error}=await sb.storage.from(BUCKET).upload(path,blob,{upsert:true,contentType:'image/jpeg'});
+      const ext=isGif?'gif':'jpg';
+      const mime=isGif?'image/gif':'image/jpeg';
+      const path='photos/'+id+'.'+ext;
+      const{error}=await sb.storage.from(BUCKET).upload(path,blob,{upsert:true,contentType:mime});
       if(error)throw error;
       const{data}=sb.storage.from(BUCKET).getPublicUrl(path);
       setImgs(p=>({...p,[id]:data.publicUrl+'?v='+Date.now()}));
@@ -440,7 +464,7 @@ function UploadProvider({children}){
 
   return(
     <UploadCtx.Provider value={{imgs,open,syncing,editMode}}>
-      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={onFile}/>
+      <input ref={fileRef} type="file" accept="image/*,image/gif" style={{display:"none"}} onChange={onFile}/>
       {editMode&&<div style={{position:"fixed",bottom:20,left:20,background:"#042C53",color:"#B5D4F4",padding:"7px 16px",borderRadius:20,fontSize:".78rem",fontWeight:500,zIndex:9997,boxShadow:"0 2px 12px rgba(0,0,0,.4)"}}>Edit mode ON</div>}
       {syncing&&<div style={{position:"fixed",bottom:20,right:20,background:"#042C53",color:"#fff",padding:"8px 16px",borderRadius:8,fontSize:".8rem",zIndex:9998}}>Saving photo...</div>}
       {modal&&<CropModal src={modal.src} aspect={modal.aspect} onConfirm={onConfirm} onCancel={()=>setModal(null)}/>}
@@ -757,6 +781,10 @@ function SolutionPage({defaultTab}){
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
             <div><PH icon="settings" title="Headset on Subject" sub="Click to upload" phId="headset-photo" aspect="4:3" h={160}/><p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 3. EEGrid headset worn by subject during real-world fit testing.</p></div>
             <div><PH icon="camera" title="CAD Render / Assembly" sub="Click to upload" phId="cad-photo" aspect="4:3" h={160}/><p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 4. CAD render of modular electrode housing assembly with TPU strap connection.</p></div>
+          </div>
+          <div style={{marginTop:"1rem"}}>
+            <PH icon="layout-grid" title="Electrode Configurations" sub="Click to upload" phId="config-photo" aspect="16:9" h={200}/>
+            <p style={{fontSize:".75rem",color:"#9ca3af",textAlign:"center",marginTop:4,fontStyle:"italic"}}>Figure 5. EEGrid in different electrode configurations.</p>
           </div>
           <hr style={{border:"none",borderTop:".5px solid #e5e7eb",margin:"1.75rem 0"}}/>
           <h3 style={{fontWeight:700,fontSize:"1.5rem",color:"#042C53",marginBottom:"1rem",letterSpacing:"-.02em"}}>Technical Drawings</h3>
