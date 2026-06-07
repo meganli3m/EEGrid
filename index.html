@@ -400,10 +400,16 @@ function UploadProvider({children}){
       try{
         const{data,error}=await sb.storage.from(BUCKET).list('photos',{limit:100});
         if(error||!data)return;
-        const loaded={};
+        // Group files by id — prefer .gif over .jpg if both exist
+        const byId={};
         for(const f of data){
           const id=f.name.replace(/\.[^.]+$/,'');
-          const{data:d}=sb.storage.from(BUCKET).getPublicUrl('photos/'+f.name);
+          const ext=f.name.split('.').pop();
+          if(!byId[id]||ext==='gif') byId[id]=f.name;
+        }
+        const loaded={};
+        for(const[id,fname] of Object.entries(byId)){
+          const{data:d}=sb.storage.from(BUCKET).getPublicUrl('photos/'+fname);
           loaded[id]=d.publicUrl+'?v='+Date.now();
         }
         if(Object.keys(loaded).length)setImgs(loaded);
@@ -429,14 +435,18 @@ function UploadProvider({children}){
         const id=pending.current.id;
         setImgs(p=>({...p,[id]:b64}));
         setSyncing(true);
-        fetch(b64).then(r=>r.blob()).then(blob=>{
-          const path='photos/'+id+'.gif';
-          return sb.storage.from(BUCKET).upload(path,blob,{upsert:true,contentType:'image/gif'});
-        }).then(({error,data})=>{
-          if(error)throw error;
-          const{data:d}=sb.storage.from(BUCKET).getPublicUrl('photos/'+id+'.gif');
-          setImgs(p=>({...p,[id]:d.publicUrl+'?v='+Date.now()}));
-        }).catch(e=>console.warn('GIF upload failed:',e)).finally(()=>setSyncing(false));
+        (async()=>{
+          try{
+            const blob=await fetch(b64).then(r=>r.blob());
+            const path='photos/'+id+'.gif';
+            await sb.storage.from(BUCKET).remove(['photos/'+id+'.jpg']).catch(()=>{});
+            const{error}=await sb.storage.from(BUCKET).upload(path,blob,{upsert:true,contentType:'image/gif'});
+            if(error)throw error;
+            const{data:d}=sb.storage.from(BUCKET).getPublicUrl(path);
+            setImgs(p=>({...p,[id]:d.publicUrl+'?v='+Date.now()}));
+          }catch(e){console.warn('GIF upload failed:',e);}
+          finally{setSyncing(false);}
+        })();
       } else {
         setModal({id:pending.current.id,src:ev.target.result,aspect:pending.current.aspect});
       }
@@ -458,6 +468,9 @@ function UploadProvider({children}){
       const ext=isGif?'gif':'jpg';
       const mime=isGif?'image/gif':'image/jpeg';
       const path='photos/'+id+'.'+ext;
+      // Delete the opposite format to avoid stale file on reload
+      const oldExt=isGif?'jpg':'gif';
+      await sb.storage.from(BUCKET).remove(['photos/'+id+'.'+oldExt]).catch(()=>{});
       const{error}=await sb.storage.from(BUCKET).upload(path,blob,{upsert:true,contentType:mime});
       if(error)throw error;
       const{data}=sb.storage.from(BUCKET).getPublicUrl(path);
